@@ -4,6 +4,9 @@
 #include"CryptoUtil.h"
 
 #include "secp256k1.h"
+#ifdef USE_LIBSECP256K1
+#include </usr/include/secp256k1.h>
+#endif
 
 
 using namespace secp256k1;
@@ -715,20 +718,58 @@ ecpoint secp256k1::addPoints(const ecpoint &p1, const ecpoint &p2)
 
 ecpoint secp256k1::multiplyPoint(const uint256 &k, const ecpoint &p)
 {
-	ecpoint sum = pointAtInfinity();
-	ecpoint d = p;
+#ifdef USE_LIBSECP256K1
+        (void)p;
+        static secp256k1_context *ctx = NULL;
+        if(!ctx) {
+                ctx = secp256k1_context_create(SECP256K1_CONTEXT_SIGN);
+        }
 
-	for(int i = 0; i < 256; i++) {
-		unsigned int mask = 1 << (i % 32);
+        unsigned int words[8];
+        k.exportWords(words, 8, uint256::BigEndian);
+        unsigned char seckey[32];
+        for(int i = 0; i < 8; i++) {
+                seckey[i*4] = (words[i] >> 24) & 0xFF;
+                seckey[i*4+1] = (words[i] >> 16) & 0xFF;
+                seckey[i*4+2] = (words[i] >> 8) & 0xFF;
+                seckey[i*4+3] = words[i] & 0xFF;
+        }
 
-		if(k.v[i / 32] & mask) {
-			sum = addPoints(sum, d);
-		}
+        secp256k1_pubkey pubkey;
+        if(!secp256k1_ec_pubkey_create(ctx, &pubkey, seckey)) {
+                return pointAtInfinity();
+        }
 
-		d = doublePoint(d);
-	}
+        unsigned char out[65];
+        size_t outLen = sizeof(out);
+        secp256k1_ec_pubkey_serialize(ctx, out, &outLen, &pubkey, SECP256K1_EC_UNCOMPRESSED);
 
-	return sum;
+        unsigned int xWords[8];
+        unsigned int yWords[8];
+        for(int i = 0; i < 8; i++) {
+                xWords[i] = ((unsigned int)out[1 + i*4] << 24) | ((unsigned int)out[1 + i*4 + 1] << 16) |
+                             ((unsigned int)out[1 + i*4 + 2] << 8) | (unsigned int)out[1 + i*4 + 3];
+                yWords[i] = ((unsigned int)out[33 + i*4] << 24) | ((unsigned int)out[33 + i*4 + 1] << 16) |
+                             ((unsigned int)out[33 + i*4 + 2] << 8) | (unsigned int)out[33 + i*4 + 3];
+        }
+
+        return ecpoint(uint256(xWords, uint256::BigEndian), uint256(yWords, uint256::BigEndian));
+#else
+        ecpoint sum = pointAtInfinity();
+        ecpoint d = p;
+
+        for(int i = 0; i < 256; i++) {
+                unsigned int mask = 1 << (i % 32);
+
+                if(k.v[i / 32] & mask) {
+                        sum = addPoints(sum, d);
+                }
+
+                d = doublePoint(d);
+        }
+
+        return sum;
+#endif
 }
 
 uint256 generatePrivateKey()

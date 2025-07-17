@@ -42,6 +42,7 @@ INCLUDE = \
 LIBS = \
   -L$(LIBDIR) \
   -laddressutil \
+  -lbitsecp256k1 \
   -lsecp256k1 \
   -lcryptoutil \
   -lutil \

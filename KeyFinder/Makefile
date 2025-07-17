@@ -47,6 +47,7 @@ INCLUDE = \
 COMMON_LIBS = \
   -lkeyfinder \
   -laddressutil \
+  -lbitsecp256k1 \
   -lsecp256k1 \
   -lcryptoutil \
   -llogger \

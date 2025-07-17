@@ -1,4 +1,4 @@
-NAME=secp256k1
+NAME=bitsecp256k1
 SRC=$(wildcard *.cpp)
 OBJS=$(SRC:.cpp=.o)
 
