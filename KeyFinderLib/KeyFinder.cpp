@@ -104,6 +104,22 @@ void KeyFinder::setTargets(std::string targetsFile)
     _device->setTargets(_targets);
 }
 
+void KeyFinder::setTargetsFromHash160(const std::vector<hash160> &hashes)
+{
+    if(hashes.size() == 0) {
+        throw KeySearchException("Requires at least 1 target");
+    }
+
+    _targets.clear();
+
+    for(size_t i = 0; i < hashes.size(); i++) {
+        KeySearchTarget t(hashes[i].h);
+        _targets.insert(t);
+    }
+
+    _device->setTargets(_targets);
+}
+
 
 void KeyFinder::setResultCallback(void(*callback)(KeySearchResult))
 {

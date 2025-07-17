@@ -57,8 +57,9 @@ public:
 	void setStatusCallback(void(*callback)(KeySearchStatus));
 	void setStatusInterval(uint64_t interval);
 
-	void setTargets(std::string targetFile);
-	void setTargets(std::vector<std::string> &targets);
+        void setTargets(std::string targetFile);
+        void setTargets(std::vector<std::string> &targets);
+        void setTargetsFromHash160(const std::vector<hash160> &hashes);
 
     secp256k1::uint256 getNextKey();
 };
