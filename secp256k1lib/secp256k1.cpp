@@ -133,7 +133,85 @@ static uint256 rightShift(const uint256 &x, int count)
 	}
 	r.v[7] = x.v[7] >> count;
 
-	return r;
+        return r;
+}
+
+static uint256 mulShift(const uint256 &a, const uint256 &b, int shift)
+{
+        unsigned int product[16] = {0};
+
+        multiply(a.v, 8, b.v, 8, product);
+
+        int wordShift = shift / 32;
+        int bitShift = shift % 32;
+        unsigned int words[8] = {0};
+
+        for(int i = 0; i < 8; i++) {
+                unsigned long long val = 0;
+                int idx = i + wordShift;
+
+                if(idx < 16) {
+                        val = product[idx];
+                        if(bitShift && idx + 1 < 16) {
+                                val >>= bitShift;
+                                val |= (unsigned long long)product[idx + 1] << (32 - bitShift);
+                        } else {
+                                val >>= bitShift;
+                        }
+                }
+
+                words[i] = (unsigned int)val;
+        }
+
+        return uint256(words);
+}
+
+ecpoint secp256k1::multiplyPoint_basic(const uint256 &k, const ecpoint &p)
+{
+        ecpoint sum = pointAtInfinity();
+        ecpoint d = p;
+
+        for(int i = 0; i < 256; i++) {
+                unsigned int mask = 1 << (i % 32);
+
+                if(k.v[i / 32] & mask) {
+                        sum = addPoints(sum, d);
+                }
+
+                d = doublePoint(d);
+        }
+
+        return sum;
+}
+
+static void splitLambda(const uint256 &k, uint256 &k1, uint256 &k2)
+{
+        static const unsigned int minus_b1_words[8] = {
+                0x0ABFE4C3, 0x6F547FA9, 0x010E8828, 0xE4437ED6,
+                0x00000000, 0x00000000, 0x00000000, 0x00000000 };
+        static const unsigned int minus_b2_words[8] = {
+                0x3DB1562C, 0xD765CDA8, 0x0774346D, 0x8A280AC5,
+                0xFFFFFFFE, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF };
+        static const unsigned int g1_words[8] = {
+                0x45DBB031, 0xE893209A, 0x71E8CA7F, 0x3DAA8A14,
+                0x9284EB15, 0xE86C90E4, 0xA7D46BCD, 0x3086D221 };
+        static const unsigned int g2_words[8] = {
+                0x8AC47F71, 0x1571B4AE, 0x9DF506C6, 0x221208AC,
+                0x0ABFE4C4, 0x6F547FA9, 0x010E8828, 0xE4437ED6 };
+
+        static const uint256 MINUS_B1(minus_b1_words);
+        static const uint256 MINUS_B2(minus_b2_words);
+        static const uint256 G1(g1_words);
+        static const uint256 G2(g2_words);
+
+        uint256 c1 = mulShift(k, G1, 384);
+        uint256 c2 = mulShift(k, G2, 384);
+
+        c1 = multiplyModN(c1, MINUS_B1);
+        c2 = multiplyModN(c2, MINUS_B2);
+
+        k2 = addModN(c1, c2);
+        k1 = subModN(k, multiplyModN(k2, LAMBDA));
 }
 
 uint256 uint256::mul(const uint256 &x) const
@@ -755,20 +833,15 @@ ecpoint secp256k1::multiplyPoint(const uint256 &k, const ecpoint &p)
 
         return ecpoint(uint256(xWords, uint256::BigEndian), uint256(yWords, uint256::BigEndian));
 #else
-        ecpoint sum = pointAtInfinity();
-        ecpoint d = p;
+        uint256 k1, k2;
+        splitLambda(k, k1, k2);
 
-        for(int i = 0; i < 256; i++) {
-                unsigned int mask = 1 << (i % 32);
+        ecpoint q1 = multiplyPoint_basic(k1, p);
 
-                if(k.v[i / 32] & mask) {
-                        sum = addPoints(sum, d);
-                }
+        ecpoint psi = ecpoint(multiplyModP(p.x, BETA), p.y);
+        ecpoint q2 = multiplyPoint_basic(k2, psi);
 
-                d = doublePoint(d);
-        }
-
-        return sum;
+        return addPoints(q1, q2);
 #endif
 }
 
