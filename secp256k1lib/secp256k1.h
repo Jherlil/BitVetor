@@ -332,11 +332,14 @@ namespace secp256k1 {
 	const uint256 P(_P_WORDS);
 	const uint256 N(_N_WORDS);
 
-	const uint256 BETA(_BETA_WORDS);
-	const uint256 LAMBDA(_LAMBDA_WORDS);
+        const uint256 BETA(_BETA_WORDS);
+        const uint256 LAMBDA(_LAMBDA_WORDS);
 
-	ecpoint pointAtInfinity();
-	ecpoint G();
+        ecpoint pointAtInfinity();
+        ecpoint G();
+
+        // Apply curve endomorphism used by GLV decomposition
+        ecpoint applyEndomorphism(const ecpoint &p);
 
 
 	uint256 negModP(const uint256 &x);

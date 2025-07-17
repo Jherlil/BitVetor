@@ -791,7 +791,12 @@ ecpoint secp256k1::addPoints(const ecpoint &p1, const ecpoint &p2)
 	sum.x = rx;
 	sum.y = ry;
 
-	return sum;
+        return sum;
+}
+
+ecpoint secp256k1::applyEndomorphism(const ecpoint &p)
+{
+        return ecpoint(multiplyModP(p.x, BETA), p.y);
 }
 
 ecpoint secp256k1::multiplyPoint(const uint256 &k, const ecpoint &p)
@@ -838,7 +843,7 @@ ecpoint secp256k1::multiplyPoint(const uint256 &k, const ecpoint &p)
 
         ecpoint q1 = multiplyPoint_basic(k1, p);
 
-        ecpoint psi = ecpoint(multiplyModP(p.x, BETA), p.y);
+        ecpoint psi = applyEndomorphism(p);
         ecpoint q2 = multiplyPoint_basic(k2, psi);
 
         return addPoints(q1, q2);
