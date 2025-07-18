@@ -42,6 +42,9 @@ typedef struct {
  
     std::vector<std::string> targets;
 
+    std::vector<hash160> hashTargets;
+    bool useHash160 = false;
+
     std::string targetsFile = "";
 
     std::string checkpointFile = "";
@@ -215,6 +218,7 @@ void usage()
     printf("--stride N              Increment by N keys at a time\n");
     printf("--share M/N             Divide the keyspace into N equal shares, process the Mth share\n");
     printf("--continue FILE         Save/load progress from FILE\n");
+    printf("--hash160               Interpret targets as 40 hex-character hashes\n");
 }
 
 
@@ -272,6 +276,24 @@ bool readAddressesFromFile(const std::string &fileName, std::vector<std::string>
     } else {
         return util::readLinesFromStream(fileName, lines);
     }
+}
+
+bool parseHash160String(const std::string &s, hash160 &out)
+{
+    std::string t = util::trim(s);
+    if(t.length() != 40) {
+        return false;
+    }
+    if(!util::isHex(t)) {
+        return false;
+    }
+    secp256k1::uint256 val("0x" + t);
+    unsigned int words[8];
+    val.exportWords(words, 8, secp256k1::uint256::BigEndian);
+    for(int i = 0; i < 5; i++) {
+        out.h[i] = words[i + 3];
+    }
+    return true;
 }
 
 int parseCompressionString(const std::string &s)
@@ -410,9 +432,34 @@ int run()
         f.init();
 
         if(!_config.targetsFile.empty()) {
-            f.setTargets(_config.targetsFile);
+            if(_config.useHash160) {
+                std::vector<std::string> lines;
+                if(!readAddressesFromFile(_config.targetsFile, lines)) {
+                    Logger::log(LogLevel::Error, "Unable to open '" + _config.targetsFile + "'");
+                    return 1;
+                }
+                std::vector<hash160> hashes;
+                for(size_t i = 0; i < lines.size(); i++) {
+                    util::removeNewline(lines[i]);
+                    lines[i] = util::trim(lines[i]);
+                    if(lines[i].length() == 0) continue;
+                    hash160 h;
+                    if(!parseHash160String(lines[i], h)) {
+                        Logger::log(LogLevel::Error, "Invalid hash160 '" + lines[i] + "'");
+                        return 1;
+                    }
+                    hashes.push_back(h);
+                }
+                f.setTargetsFromHash160(hashes);
+            } else {
+                f.setTargets(_config.targetsFile);
+            }
         } else {
-            f.setTargets(_config.targets);
+            if(_config.useHash160) {
+                f.setTargetsFromHash160(_config.hashTargets);
+            } else {
+                f.setTargets(_config.targets);
+            }
         }
 
         f.run();
@@ -517,6 +564,7 @@ int main(int argc, char **argv)
     parser.add("", "--continue", true);
     parser.add("", "--share", true);
     parser.add("", "--stride", true);
+    parser.add("", "--hash160", false);
 
     try {
         parser.parse(argc, argv);
@@ -602,6 +650,8 @@ int main(int argc, char **argv)
                 }
             } else if(optArg.equals("-f", "--follow")) {
                 _config.follow = true;
+            } else if(optArg.equals("", "--hash160")) {
+                _config.useHash160 = true;
             }
 
 		} catch(std::string err) {
@@ -621,26 +671,34 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	// Parse operands
-	std::vector<std::string> ops = parser.getOperands();
+        // Parse operands
+        std::vector<std::string> ops = parser.getOperands();
 
-    // If there are no operands, then we must be reading from a file, otherwise
-    // expect addresses on the commandline
-	if(ops.size() == 0) {
-		if(_config.targetsFile.length() == 0) {
-			Logger::log(LogLevel::Error, "Missing arguments");
-			usage();
-			return 1;
-		}
-	} else {
-		for(unsigned int i = 0; i < ops.size(); i++) {
-            if(!Address::verifyAddress(ops[i])) {
-                Logger::log(LogLevel::Error, "Invalid address '" + ops[i] + "'");
-                return 1;
+    // If there are no operands, then we must be reading from a file
+        if(ops.size() == 0) {
+                if(_config.targetsFile.length() == 0) {
+                        Logger::log(LogLevel::Error, "Missing arguments");
+                        usage();
+                        return 1;
+                }
+        } else {
+                for(unsigned int i = 0; i < ops.size(); i++) {
+            if(_config.useHash160) {
+                hash160 h;
+                if(!parseHash160String(ops[i], h)) {
+                    Logger::log(LogLevel::Error, "Invalid hash160 '" + ops[i] + "'");
+                    return 1;
+                }
+                _config.hashTargets.push_back(h);
+            } else {
+                if(!Address::verifyAddress(ops[i])) {
+                    Logger::log(LogLevel::Error, "Invalid address '" + ops[i] + "'");
+                    return 1;
+                }
+                _config.targets.push_back(ops[i]);
             }
-			_config.targets.push_back(ops[i]);
-		}
-	}
+                }
+        }
     
     // Calculate where to start and end in the keyspace when the --share option is used
     if(optShares) {

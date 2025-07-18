@@ -118,12 +118,12 @@ namespace util {
 		return val;
 	}
 
-	bool isHex(const std::string &s)
-	{
-		int len = 0;
+        bool isHex(const std::string &s)
+        {
+                int len = (int)s.length();
 
-		for(int i = 0; i < len; i++) {
-			char c = s[i];
+                for(int i = 0; i < len; i++) {
+                        char c = s[i];
 
 			if(!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))) {
 				return false;

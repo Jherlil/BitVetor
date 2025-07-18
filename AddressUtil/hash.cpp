@@ -12,9 +12,9 @@ static unsigned int endian(unsigned int x)
 bool Address::verifyAddress(std::string address)
 {
 	// Check length
-	if(address.length() > 34) {
-		false;
-	}
+        if(address.length() > 34) {
+                return false;
+        }
 
 	// Check encoding
 	if(!Base58::isBase58(address)) {
