@@ -5,7 +5,7 @@
 
 #include "secp256k1.h"
 #ifdef USE_LIBSECP256K1
-#include </usr/include/secp256k1.h>
+#include <secp256k1.h>
 #endif
 
 
